@@ -6,10 +6,8 @@ extern crate alloc;
 
 extern crate pairing;
 extern crate rand;
-extern crate ff;
 
-use pairing::{CurveAffine, CurveProjective, Engine};
-use ff::Field;
+use pairing::{CurveAffine, CurveProjective, Engine, Field};
 use rand::{Rand, Rng};
 #[cfg(feature = "std")]
 use std::collections::{HashSet as Set};
