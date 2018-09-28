@@ -9,8 +9,13 @@ repository = "https://github.com/str4d/bls"
 version = "0.0.1"
 
 [dependencies]
-rand = "0.3"
+rand = { version = "0.4", default-features = false }
+ff = { git = "https://github.com/sorpaas/ff", default-features = false }
+pairing = { git = "https://github.com/sorpaas/pairing", default-features = false }
 
-[dependencies.pairing]
-git = "https://github.com/mmaker/pairing"
-branch = "feature/hashing"
+[features]
+std = [
+	"ff/std",
+	"pairing/std",
+]
+default = ["std"]

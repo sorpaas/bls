@@ -1,9 +1,31 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), feature(alloc))]
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
 extern crate pairing;
 extern crate rand;
+extern crate ff;
 
-use pairing::{CurveAffine, CurveProjective, Engine, Field};
+use pairing::{CurveAffine, CurveProjective, Engine};
+use ff::Field;
 use rand::{Rand, Rng};
-use std::collections::HashSet;
+#[cfg(feature = "std")]
+use std::collections::{HashSet as Set};
+#[cfg(not(feature = "std"))]
+use alloc::collections::{BTreeSet as Set};
+
+#[cfg(not(feature = "std"))]
+mod std {
+	pub use core::*;
+	pub use alloc::vec;
+	pub use alloc::string;
+	pub use alloc::boxed;
+	pub use alloc::borrow;
+}
+
+use std::vec::Vec;
 
 #[derive(Debug, PartialEq)]
 pub struct Signature<E: Engine> {
@@ -76,7 +98,7 @@ impl<E: Engine> Keypair<E> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub struct AggregateSignature<E: Engine>(Signature<E>);
 
 impl<E: Engine> AggregateSignature<E> {
@@ -98,7 +120,7 @@ impl<E: Engine> AggregateSignature<E> {
 
     pub fn verify(&self, inputs: &Vec<(&PublicKey<E>, &[u8])>) -> bool {
         // Messages must be distinct
-        let messages: HashSet<&[u8]> = inputs.iter().map(|&(_, m)| m).collect();
+        let messages: Set<&[u8]> = inputs.iter().map(|&(_, m)| m).collect();
         if messages.len() != inputs.len() {
             return false;
         }
@@ -116,7 +138,7 @@ impl<E: Engine> AggregateSignature<E> {
     ///
     /// Warning: This method is vulnerable to the "rouge public-key attack".
     /// Every user must be required to prove knowledge or possession of their
-    /// corresponding secret key. For more information, see: 
+    /// corresponding secret key. For more information, see:
     /// https://eprint.iacr.org/2018/483.pdf
     pub fn verify_common_message(
         &self,
