@@ -56,6 +56,14 @@ pub struct Secret<E: Engine> {
     x: E::Fr,
 }
 
+impl<E: Engine> Clone for Secret<E> {
+    fn clone(&self) -> Self {
+        Self {
+            x: self.x.clone()
+        }
+    }
+}
+
 impl<E: Engine> Secret<E> {
     pub fn generate<R: Rng>(csprng: &mut R) -> Self {
         Secret {
