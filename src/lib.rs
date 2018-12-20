@@ -30,13 +30,13 @@ pub struct Signature<E: Engine> {
     s: E::G2,
 }
 
-pub struct SecretKey<E: Engine> {
+pub struct Secret<E: Engine> {
     x: E::Fr,
 }
 
-impl<E: Engine> SecretKey<E> {
+impl<E: Engine> Secret<E> {
     pub fn generate<R: Rng>(csprng: &mut R) -> Self {
-        SecretKey {
+        Secret {
             x: E::Fr::rand(csprng),
         }
     }
@@ -47,11 +47,11 @@ impl<E: Engine> SecretKey<E> {
     }
 }
 
-pub struct PublicKey<E: Engine> {
+pub struct Public<E: Engine> {
     p_pub: E::G1,
 }
 
-impl<E: Engine> Clone for PublicKey<E> {
+impl<E: Engine> Clone for Public<E> {
     fn clone(&self) -> Self {
         Self {
             p_pub: self.p_pub.clone()
@@ -59,10 +59,10 @@ impl<E: Engine> Clone for PublicKey<E> {
     }
 }
 
-impl<E: Engine> PublicKey<E> {
-    pub fn from_secret(secret: &SecretKey<E>) -> Self {
+impl<E: Engine> Public<E> {
+    pub fn from_secret(secret: &Secret<E>) -> Self {
         // TODO Decide on projective vs affine
-        PublicKey {
+        Public {
             p_pub: E::G1Affine::one().mul(secret.x),
         }
     }
@@ -75,16 +75,16 @@ impl<E: Engine> PublicKey<E> {
     }
 }
 
-pub struct Keypair<E: Engine> {
-    pub secret: SecretKey<E>,
-    pub public: PublicKey<E>,
+pub struct Pair<E: Engine> {
+    pub secret: Secret<E>,
+    pub public: Public<E>,
 }
 
-impl<E: Engine> Keypair<E> {
+impl<E: Engine> Pair<E> {
     pub fn generate<R: Rng>(csprng: &mut R) -> Self {
-        let secret = SecretKey::generate(csprng);
-        let public = PublicKey::from_secret(&secret);
-        Keypair { secret, public }
+        let secret = Secret::generate(csprng);
+        let public = Public::from_secret(&secret);
+        Pair { secret, public }
     }
 
     pub fn sign(&self, message: &[u8]) -> Signature<E> {
@@ -116,7 +116,7 @@ mod tests {
         let mut rng = XorShiftRng::from_seed([0xbc4f6d44, 0xd62f276c, 0xb963afd0, 0x5455863d]);
 
         for i in 0..loop_count {
-            let keypair = Keypair::<Bls12>::generate(&mut rng);
+            let keypair = Pair::<Bls12>::generate(&mut rng);
             let message = format!(">16 character message {}", i);
             let sig = keypair.sign(&message.as_bytes());
             assert_eq!(keypair.verify(&message.as_bytes(), &sig), true);
@@ -136,7 +136,7 @@ mod tests {
         let mut rng = XorShiftRng::from_seed([0xbc4f6d44, 0xd62f276c, 0xb963afd0, 0x5455863d]);
 
         for i in 0..loop_count {
-            let keypair = Keypair::<Bls12>::generate(&mut rng);
+            let keypair = Pair::<Bls12>::generate(&mut rng);
             let message = format!(">16 character message {}", i);
             let sig = keypair.sign(&message.as_bytes());
             let cloned_pub = keypair.public.clone();
