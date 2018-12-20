@@ -7,7 +7,8 @@ extern crate alloc;
 extern crate pairing;
 extern crate rand;
 
-use pairing::{CurveAffine, CurveProjective, Engine, Field};
+use pairing::{CurveAffine, Engine, PrimeField, EncodedPoint};
+use pairing::bls12_381::{Bls12, Fr, FrRepr, G1Compressed, G2Compressed};
 use rand::{Rand, Rng};
 #[cfg(feature = "std")]
 use std::collections::{HashSet as Set};
@@ -30,6 +31,27 @@ pub struct Signature<E: Engine> {
     s: E::G2,
 }
 
+impl Signature<Bls12> {
+    pub fn to_compressed_bytes(&self) -> [u8; 96] {
+        let mut ret = [0u8; 96];
+        ret.copy_from_slice(&G2Compressed::from_affine(self.s.clone().into()).as_ref());
+        ret
+    }
+
+    pub fn from_compressed_bytes(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != 96 {
+            return None;
+        }
+        let mut g2 = G2Compressed::empty();
+        g2.as_mut().copy_from_slice(bytes);
+        let affine = g2.into_affine().ok()?;
+
+        Some(Self {
+            s: affine.into(),
+        })
+    }
+}
+
 pub struct Secret<E: Engine> {
     x: E::Fr,
 }
@@ -44,6 +66,20 @@ impl<E: Engine> Secret<E> {
     pub fn sign(&self, message: &[u8]) -> Signature<E> {
         let h = E::G2Affine::hash(message);
         Signature { s: h.mul(self.x) }
+    }
+}
+
+impl Secret<Bls12> {
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        let mut ints = [0u64; 4];
+        for (i, byte) in bytes.iter().enumerate() {
+            let z = i / 8;
+            if z >= ints.len() {
+                return None
+            }
+            ints[z] |= (*byte as u64) << (i - z * 8);
+        }
+        Fr::from_repr(FrRepr(ints)).ok().map(|fr| Secret { x: fr })
     }
 }
 
@@ -75,6 +111,27 @@ impl<E: Engine> Public<E> {
     }
 }
 
+impl Public<Bls12> {
+    pub fn to_compressed_bytes(&self) -> [u8; 48] {
+        let mut ret = [0u8; 48];
+        ret.copy_from_slice(&G1Compressed::from_affine(self.p_pub.clone().into()).as_ref());
+        ret
+    }
+
+    pub fn from_compressed_bytes(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != 48 {
+            return None;
+        }
+        let mut g1 = G1Compressed::empty();
+        g1.as_mut().copy_from_slice(bytes);
+        let affine = g1.into_affine().ok()?;
+
+        Some(Self {
+            p_pub: affine.into(),
+        })
+    }
+}
+
 pub struct Pair<E: Engine> {
     pub secret: Secret<E>,
     pub public: Public<E>,
@@ -85,6 +142,13 @@ impl<E: Engine> Pair<E> {
         let secret = Secret::generate(csprng);
         let public = Public::from_secret(&secret);
         Pair { secret, public }
+    }
+
+    pub fn from_secret(secret: Secret<E>) -> Self {
+        Pair {
+            public: Public::from_secret(&secret),
+            secret,
+        }
     }
 
     pub fn sign(&self, message: &[u8]) -> Signature<E> {
