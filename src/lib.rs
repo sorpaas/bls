@@ -203,6 +203,16 @@ impl<E: Engine> AggregateSignature<E> {
     }
 }
 
+impl AggregateSignature<Bls12> {
+    pub fn to_compressed_bytes(&self) -> [u8; 96] {
+        self.0.to_compressed_bytes()
+    }
+
+    pub fn from_compressed_bytes(bytes: &[u8]) -> Option<Self> {
+        Signature::from_compressed_bytes(bytes).and_then(|s| Some(AggregateSignature(s)))
+    }
+}
+
 pub struct AggregatePublic<E: Engine>(Public<E>);
 
 impl<E: Engine> AggregatePublic<E> {
