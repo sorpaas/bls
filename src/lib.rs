@@ -7,7 +7,7 @@ extern crate alloc;
 extern crate pairing;
 extern crate rand;
 
-use pairing::{CurveAffine, Engine, PrimeField, EncodedPoint};
+use pairing::{CurveAffine, Engine, PrimeField, Field, EncodedPoint, CurveProjective};
 use pairing::bls12_381::{Bls12, Fr, FrRepr, G1Compressed, G2Compressed};
 use rand::{Rand, Rng};
 #[cfg(feature = "std")]
@@ -23,8 +23,6 @@ mod std {
 	pub use alloc::boxed;
 	pub use alloc::borrow;
 }
-
-use std::vec::Vec;
 
 #[derive(Debug, PartialEq)]
 pub struct Signature<E: Engine> {
@@ -168,6 +166,63 @@ impl<E: Engine> Pair<E> {
     }
 }
 
+pub struct AggregateSignature<E: Engine>(Signature<E>);
+
+impl<E: Engine> AggregateSignature<E> {
+    pub fn new() -> Self {
+        AggregateSignature(Signature { s: E::G2::zero() })
+    }
+
+    pub fn from_signatures(sigs: &[Signature<E>]) -> Self {
+        let mut s = Self::new();
+        for sig in sigs {
+            s.aggregate(sig);
+        }
+        s
+    }
+
+    pub fn aggregate(&mut self, sig: &Signature<E>) {
+        self.0.s.add_assign(&sig.s);
+    }
+
+    pub fn verify(&self, inputs: &[(&Public<E>, &[u8])]) -> bool {
+        // Messages must be distinct
+        let messages: Set<&[u8]> = inputs.iter().map(|&(_, m)| m).collect();
+        if messages.len() != inputs.len() {
+            return false;
+        }
+
+        let lhs = E::pairing(E::G1Affine::one(), self.0.s);
+        let mut rhs = E::Fqk::one();
+        for input in inputs {
+            let h = E::G2Affine::hash(input.1);
+            rhs.mul_assign(&E::pairing(input.0.p_pub, h));
+        }
+
+        lhs == rhs
+    }
+}
+
+pub struct AggregatePublic<E: Engine>(Public<E>);
+
+impl<E: Engine> AggregatePublic<E> {
+    pub fn new() -> Self {
+        AggregatePublic(Public { p_pub: E::G1::zero() })
+    }
+
+    pub fn from_keys(keys: &[Public<E>]) -> Self {
+        let mut s = Self::new();
+        for key in keys {
+            s.aggregate(key);
+        }
+        s
+    }
+
+    pub fn aggregate(&mut self, key: &Public<E>) {
+        self.0.p_pub.add_assign(&key.p_pub);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -215,4 +270,41 @@ mod tests {
             assert_eq!(cloned_pub.verify(&message.as_bytes(), &sig), true);
         }
     }
+
+    #[test]
+    fn test_aggregate_sign_short() {
+        aggregate_sign(10);
+    }
+    #[test]
+    #[ignore]
+    fn test_aggregate_sign_long() {
+        aggregate_sign(500);
+    }
+    fn aggregate_sign(loop_count: u32) {
+        let mut rng = XorShiftRng::from_seed([0xbc4f6d44, 0xd62f276c, 0xb963afd0, 0x5455863d]);
+
+        let mut inputs = Vec::with_capacity(1000);
+        let mut signatures = Vec::with_capacity(1000);
+        for i in 0..loop_count {
+            let keypair = Pair::<Bls12>::generate(&mut rng);
+            let message = format!(">16 character message {}", i);
+            let signature = keypair.sign(&message.as_bytes());
+            inputs.push((keypair.public, message));
+            signatures.push(signature);
+
+            // Only test near the beginning and the end, to reduce test runtime
+            if i < 10 || i > (loop_count - 10) {
+                let asig = AggregateSignature::from_signatures(&signatures);
+                assert_eq!(
+                    asig.verify(&inputs
+                        .iter()
+                        .map(|&(ref pk, ref m)| (pk, m.as_bytes()))
+                        .collect::<Vec<_>>()),
+                    true
+                );
+            }
+        }
+    }
+
+
 }
