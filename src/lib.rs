@@ -29,6 +29,12 @@ pub struct Signature<E: Engine> {
     s: E::G2,
 }
 
+impl<E: Engine> Signature<E> {
+    pub fn add_assign(&mut self, sig: &Signature<E>) {
+        self.s.add_assign(&sig.s);
+    }
+}
+
 impl Signature<Bls12> {
     pub fn to_compressed_bytes(&self) -> [u8; 96] {
         let mut ret = [0u8; 96];
@@ -114,6 +120,10 @@ impl<E: Engine> Public<E> {
         let lhs = E::pairing(E::G1Affine::one(), signature.s);
         let rhs = E::pairing(self.p_pub, h);
         lhs == rhs
+    }
+
+    pub fn add_assign(&mut self, key: &Public<E>) {
+        self.p_pub.add_assign(&key.p_pub);
     }
 }
 
