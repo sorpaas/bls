@@ -30,6 +30,10 @@ pub struct Signature<E: Engine> {
 }
 
 impl<E: Engine> Signature<E> {
+    pub fn new() -> Self {
+        Self { s: E::G2::zero() }
+    }
+
     pub fn add_assign(&mut self, sig: &Signature<E>) {
         self.s.add_assign(&sig.s);
     }
@@ -108,6 +112,10 @@ impl<E: Engine> Clone for Public<E> {
 }
 
 impl<E: Engine> Public<E> {
+    pub fn new() -> Self {
+        Self { p_pub: E::G1::zero() }
+    }
+
     pub fn from_secret(secret: &Secret<E>) -> Self {
         // TODO Decide on projective vs affine
         Public {
